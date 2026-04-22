@@ -1,13 +1,13 @@
 // src/main.rs
 use chrono::Local;
 use std::fmt;
-use std::fs::OpenOptions;
+use sysinfo::{System, Process};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use sysinfo::{Process, System};
+use std::fs::OpenOptions;
 
 const AUTH_TOKEN: &str = "ENSPD2026";
 
@@ -46,11 +46,7 @@ struct SystemSnapshot {
 
 impl fmt::Display for CpuInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "CPU: {:.1}% ({} cœurs)",
-            self.usage_percent, self.core_count
-        )
+        write!(f, "CPU: {:.1}% ({} cœurs)", self.usage_percent, self.core_count)
     }
 }
 
@@ -118,9 +114,7 @@ fn collect_snapshot() -> Result<SystemSnapshot, SysWatchError> {
     let core_count = sys.cpus().len();
 
     if core_count == 0 {
-        return Err(SysWatchError::CollectionFailed(
-            "Aucun CPU détecté".to_string(),
-        ));
+        return Err(SysWatchError::CollectionFailed("Aucun CPU détecté".to_string()));
     }
 
     let total_mb = sys.total_memory() / 1024 / 1024;
@@ -144,15 +138,8 @@ fn collect_snapshot() -> Result<SystemSnapshot, SysWatchError> {
 
     Ok(SystemSnapshot {
         timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-        cpu: CpuInfo {
-            usage_percent: cpu_usage,
-            core_count,
-        },
-        memory: MemInfo {
-            total_mb,
-            used_mb,
-            free_mb,
-        },
+        cpu: CpuInfo { usage_percent: cpu_usage, core_count },
+        memory: MemInfo { total_mb, used_mb, free_mb },
         top_processes: processes,
     })
 }
@@ -170,34 +157,22 @@ fn format_response(snapshot: &SystemSnapshot, command: &str) -> String {
             (0..10)
                 .map(|i| {
                     let threshold = (snapshot.cpu.usage_percent / 10.0) as usize;
-                    if i < threshold {
-                        "█"
-                    } else {
-                        "░"
-                    }
+                    if i < threshold { "█" } else { "░" }
                 })
                 .collect::<Vec<_>>()
-                .join("")
-                + &format!(" {:.1}%", snapshot.cpu.usage_percent)
+                .join("") + &format!(" {:.1}%", snapshot.cpu.usage_percent)
         ),
 
         "mem" => {
-            let percent =
-                (snapshot.memory.used_mb as f64 / snapshot.memory.total_mb as f64) * 100.0;
+            let percent = (snapshot.memory.used_mb as f64 / snapshot.memory.total_mb as f64) * 100.0;
             let bar: String = (0..20)
-                .map(|i| {
-                    if i < (percent / 5.0) as usize {
-                        '█'
-                    } else {
-                        '░'
-                    }
-                })
+                .map(|i| if i < (percent / 5.0) as usize { '█' } else { '░' })
                 .collect();
             format!(
                 "[MÉMOIRE]\n{}\n[{}] {:.1}%\n",
                 snapshot.memory, bar, percent
             )
-        }
+        },
 
         "ps" | "procs" => {
             let lines: String = snapshot
@@ -207,12 +182,8 @@ fn format_response(snapshot: &SystemSnapshot, command: &str) -> String {
                 .map(|(i, p)| format!("{}. {}", i + 1, p))
                 .collect::<Vec<_>>()
                 .join("\n");
-            format!(
-                "[PROCESSUS — Top {}]\n{}\n",
-                snapshot.top_processes.len(),
-                lines
-            )
-        }
+            format!("[PROCESSUS — Top {}]\n{}\n", snapshot.top_processes.len(), lines)
+        },
 
         "shutdown" => {
             // Windows
@@ -246,11 +217,7 @@ fn format_response(snapshot: &SystemSnapshot, command: &str) -> String {
             let text = &cmd[4..];
             println!("\n╔══════════════════════════════════════╗");
             println!("║  MESSAGE DU PROFESSEUR               ║");
-            println!(
-                "║  {}{}║",
-                text,
-                " ".repeat(38usize.saturating_sub(text.len()))
-            );
+            println!("║  {}{}║", text, " ".repeat(38usize.saturating_sub(text.len())));
             println!("╚══════════════════════════════════════╝\n");
             format!("Message affiché sur la machine cible.\n")
         }
@@ -278,14 +245,14 @@ fn format_response(snapshot: &SystemSnapshot, command: &str) -> String {
             "  all   — Vue complète\n",
             "  help  — Cette aide\n",
             "  quit  — Fermer la connexion\n",
-        )
-        .to_string(),
+        ).to_string(),
 
         "quit" | "exit" => "BYE\n".to_string(),
 
         _ => format!("Commande inconnue: '{}'. Tape 'help'.\n", command.trim()),
     }
 }
+
 
 // // Exo 4: Serveur TCP multithreadé —
 // fn handle_client(mut stream: TcpStream, snapshot: Arc<Mutex<SystemSnapshot>>) {
@@ -348,6 +315,7 @@ fn snapshot_refresher(snapshot: Arc<Mutex<SystemSnapshot>>) {
     }
 }
 
+
 fn log_event(message: &str) {
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let line = format!("[{}] {}\n", timestamp, message);
@@ -365,9 +333,9 @@ fn log_event(message: &str) {
     }
 }
 
+
 fn handle_client(mut stream: TcpStream, snapshot: Arc<Mutex<SystemSnapshot>>) {
-    let peer = stream
-        .peer_addr()
+    let peer = stream.peer_addr()
         .map(|a| a.to_string())
         .unwrap_or("inconnu".to_string());
     log_event(&format!("[+] Connexion de {}", peer));
@@ -411,6 +379,7 @@ fn handle_client(mut stream: TcpStream, snapshot: Arc<Mutex<SystemSnapshot>>) {
     log_event(&format!("[-] Déconnexion de {}", peer));
 }
 
+
 // Main Exo 1: Types métier et affichage — Etape 3: Affichage humain avec le trait Display
 // fn main() {
 //     // Test d'affichage — données fictives pour valider les types
@@ -427,6 +396,7 @@ fn handle_client(mut stream: TcpStream, snapshot: Arc<Mutex<SystemSnapshot>>) {
 //     println!("{}", snapshot);
 // }
 
+
 // Main Exo 2: Gestion d'erreurs — Etape 1: Utilisation de Result dans la fonction de collecte et affichage complet
 
 // fn main() {
@@ -435,6 +405,7 @@ fn handle_client(mut stream: TcpStream, snapshot: Arc<Mutex<SystemSnapshot>>) {
 //         Err(e) => eprintln!("ERREUR: {}", e),
 //     }
 // }
+
 
 // Main Exo 3: Formatage de réponses — Simuler une interface textuelle simple
 
@@ -447,6 +418,7 @@ fn handle_client(mut stream: TcpStream, snapshot: Arc<Mutex<SystemSnapshot>>) {
 // }
 
 // Main Exo 4: Serveur TCP multithreadé — Etape 1: Lancement d'un serveur TCP basique
+
 
 fn main() {
     println!("SysWatch démarrage...");

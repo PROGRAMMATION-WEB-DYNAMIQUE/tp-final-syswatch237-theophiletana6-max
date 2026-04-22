@@ -1,0 +1,10 @@
+[package]
+name = "syswatch"
+version = "0.1.0"
+edition = "2021"
+authors = ["SysWatch"]
+description = "Serveur de surveillance système TCP"
+
+[dependencies]
+chrono = "0.4.44"
+sysinfo = "0.38.4"
